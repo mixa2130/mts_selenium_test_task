@@ -1,0 +1,7 @@
+/.env
+/geckodriver.exe
+/geckodriver.log
+/input.xlsx
+/venv/
+/.idea/
+/results.xlsx
