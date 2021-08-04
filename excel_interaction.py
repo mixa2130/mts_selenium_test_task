@@ -1,23 +1,25 @@
-from datetime import datetime
-from collections import deque
-import win32com.client as win32
+"""This module is responsible for interaction with Excel using pywin32"""
 import time
 import os
+from datetime import datetime
+from collections import deque
 from typing import List, NamedTuple, Tuple, Deque
+import win32com.client as win32
 
 
 class InputArgs(NamedTuple):
-    first_name: str
-    last_name: str
-    patronymic: str
-    date: str
+    first_name: str  # Имя потенциального должника
+    last_name: str  # Фамилия
+    patronymic: str  # Отчество
+    date: str  # Дата рождения
 
 
 excel = win32.gencache.EnsureDispatch('Excel.Application')
 fssp_column_names: tuple = (
     "Должник (физ. лицо: ФИО, дата и место рождения; юр. лицо: наименование, юр. адрес, фактический адрес)",
     "Исполнительное производство (номер, дата возбуждения)",
-    "Реквизиты исполнительного документа (вид, дата принятия органом, номер, наименование органа, выдавшего исполнительный документ)",
+    "Реквизиты исполнительного документа (вид, дата принятия органом, номер, наименование органа,"
+    " выдавшего исполнительный документ)",
     "Дата, причина окончания или прекращения ИП (статья, часть, пункт основания)",
     "Предмет исполнения, сумма непогашенной задолженности",
     "Отдел судебных приставов (наименование, адрес)",
@@ -26,6 +28,14 @@ fssp_column_names: tuple = (
 
 
 def write_excel_file(data: List[tuple], filename='results.xlsx'):
+    """
+    Writes data to excel file.
+    Each function call creates a new one Sheet.
+    If file with such name doesn't exist - creates it.
+
+    :param data: data to write
+    :param filename: Name of the excel file to write, lying in the project root
+    """
     if filename in os.listdir():
         wb = excel.Workbooks.Open(os.path.join(os.getcwd(), filename))
     else:
@@ -37,7 +47,10 @@ def write_excel_file(data: List[tuple], filename='results.xlsx'):
     wb.Sheets.Add().Name = new_sheet_name
     work_sh = wb.ActiveSheet
 
-    work_sh.Range(f"A1:G1").Value = fssp_column_names
+    # Header
+    work_sh.Range("A1:G1").Value = fssp_column_names
+
+    # Data
     for row, el in enumerate(data):
         if len(el) > 2:
             work_sh.Range(f"A{row + 2}:G{row + 2}").Value = el
@@ -52,6 +65,13 @@ def write_excel_file(data: List[tuple], filename='results.xlsx'):
 
 
 def read_excel_file(filename='input.xlsx') -> Deque:
+    """
+    Reads data from excel file.
+
+    :param filename: Name of the excel file to read, lying in the project root
+
+    :raise pywintypes.com_error: (-2147352567, ..): If there are no such file
+    """
     wb = excel.Workbooks.Open(os.path.join(os.getcwd(), filename))
     work_sh = wb.ActiveSheet
 
@@ -66,18 +86,14 @@ def read_excel_file(filename='input.xlsx') -> Deque:
         ).Value[0]
 
         raw_date = datetime.strptime(str(tmp[3]), "%Y-%m-%d 00:00:00+00:00")
-        birthday = raw_date.strftime("%d.%m.%Y")
+        birthday: str = raw_date.strftime("%d.%m.%Y")
 
         data.append(InputArgs(last_name=str(tmp[0]),
                               first_name=str(tmp[1]),
                               patronymic=str(tmp[2]),
-                              date=str(birthday)))
+                              date=birthday))
 
     wb.Close(True)
     excel.Application.Quit()
 
     return data
-
-
-if __name__ == '__main__':
-    print(read_excel_file())
