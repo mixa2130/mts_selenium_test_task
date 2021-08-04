@@ -8,26 +8,21 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common import keys
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from captcha import get_text_from_captcha
-from typing import List
-
-
-class InputArgs(NamedTuple):
-    first_name: str
-    last_name: str
-    patronymic: str
-    date: str
+from typing import List, Deque
+from excel_interaction import write_excel_file, InputArgs, read_excel_file
 
 
 class SessionFssp:
     def __init__(self):
         self.browser = webdriver.Firefox()
         self.wait = WebDriverWait(self.browser, 6)
+        self.browser.implicitly_wait(10)
 
         self.browser.get('https://fssp.gov.ru/')
         info_close_button = self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button.tingle-modal__close')))
         info_close_button.click()
 
-    def get_debts(self, args: InputArgs) -> List[tuple]:
+    def get_debts(self, args: InputArgs, debts: list) -> bool:
         def get_text(search_el):
             return search_el.text
 
@@ -51,36 +46,40 @@ class SessionFssp:
         if not start_page:
             last_form.send_keys(keys.Keys.ENTER)
 
-        self._solve_captcha()
+        if self._solve_captcha() == -1:
+            return False
 
-        res_table = self.browser.find_element_by_css_selector('div.results')
+        try:
+            res_table = self.browser.find_element_by_css_selector('div.results')
+        except NoSuchElementException:
+            return False
+
         try:
             res_body = res_table.find_element_by_css_selector('div.results-frame').find_element_by_css_selector('tbody')
         except NoSuchElementException:
-            return [(' '.join(args_dict.values()), 'Нет задолженностей')]
+            debts.append((' '.join(args_dict.values()), 'Нет задолженностей'))
+            return True
 
         # Results exists
-        debtors = list()
         debt_info = res_body.find_elements_by_tag_name('td')
         counter: int = 0
 
         while counter < len(debt_info):
             if debt_info[counter].get_attribute('class') == 'first':
                 tmp_lst: list = debt_info[counter:counter + 4] + debt_info[counter + 5:counter + 8]
-                debtors.append(tuple(map(get_text, tmp_lst)))
+                debts.append(tuple(map(get_text, tmp_lst)))
 
                 counter += 7
             counter += 1
 
-        return debtors
+        return True
 
-    def _solve_captcha(self):
-        time.sleep(3)
+    def _solve_captcha(self) -> int:
+        """0 - captcha solved/-1 - restart"""
         while True:
             try:
-                time.sleep(2)
-                capcha = self.browser.find_element_by_id('capchaVisual')
-                src = capcha.get_attribute('src')
+                captcha = self.browser.find_element_by_id('capchaVisual')
+                src = captcha.get_attribute('src')
             except NoSuchElementException:
                 # We've logged in
                 return 0
@@ -90,9 +89,15 @@ class SessionFssp:
                     EC.element_to_be_clickable((By.CSS_SELECTOR, 'input.input-submit-capcha')))
             except TimeoutException:
                 return 0
+
             img = urllib.request.urlretrieve(src)
             captcha_text = get_text_from_captcha(img[0])
             print(captcha_text)
+            # if captcha_text == '':
+            #     # обновить страницу
+            #     self.browser.refresh()
+            #     return -1
+
             input_form = self.browser.find_element_by_id('captcha-popup-code')
             input_form.send_keys(captcha_text)
 
@@ -103,9 +108,14 @@ class SessionFssp:
 
 
 if __name__ == '__main__':
-    smth = SessionFssp()
-    args = InputArgs('Антон', 'Мартынов', 'Валерьевич', '')
-    args2 = InputArgs('Михаил', 'Ступак', 'Викторович', '21.11.2000')
-    print(smth.get_debts(args))
-    print(smth.get_debts(args2))
+    potential_debtors: Deque = read_excel_file()
+    session = SessionFssp()
+    debts = []
+    while len(potential_debtors) > 0:
+        el = potential_debtors.popleft()
+        debt_found: bool = session.get_debts(args=el, debts=debts)
+        if not debt_found:
+            print('failed')
+            potential_debtors.append(el)
 
+    write_excel_file(debts)

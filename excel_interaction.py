@@ -1,9 +1,9 @@
 from datetime import datetime
-
+from collections import deque
 import win32com.client as win32
 import time
 import os
-from typing import List, NamedTuple, Tuple
+from typing import List, NamedTuple, Tuple, Deque
 
 
 class InputArgs(NamedTuple):
@@ -14,6 +14,15 @@ class InputArgs(NamedTuple):
 
 
 excel = win32.gencache.EnsureDispatch('Excel.Application')
+fssp_column_names: tuple = (
+    "Должник (физ. лицо: ФИО, дата и место рождения; юр. лицо: наименование, юр. адрес, фактический адрес)",
+    "Исполнительное производство (номер, дата возбуждения)",
+    "Реквизиты исполнительного документа (вид, дата принятия органом, номер, наименование органа, выдавшего исполнительный документ)",
+    "Дата, причина окончания или прекращения ИП (статья, часть, пункт основания)",
+    "Предмет исполнения, сумма непогашенной задолженности",
+    "Отдел судебных приставов (наименование, адрес)",
+    "Судебный пристав-исполнитель, телефон для получения информации"
+)
 
 
 def write_excel_file(data: List[tuple], filename='results.xlsx'):
@@ -28,6 +37,7 @@ def write_excel_file(data: List[tuple], filename='results.xlsx'):
     wb.Sheets.Add().Name = new_sheet_name
     work_sh = wb.ActiveSheet
 
+    work_sh.Range(f"A1:G1").Value = fssp_column_names
     for row, el in enumerate(data):
         if len(el) > 2:
             work_sh.Range(f"A{row + 2}:G{row + 2}").Value = el
@@ -41,13 +51,13 @@ def write_excel_file(data: List[tuple], filename='results.xlsx'):
     excel.Application.Quit()
 
 
-def read_excel_file(filename='input.xlsx'):
+def read_excel_file(filename='input.xlsx') -> Deque:
     wb = excel.Workbooks.Open(os.path.join(os.getcwd(), filename))
     work_sh = wb.ActiveSheet
 
     filled_range = len(work_sh.UsedRange)
-    row_number = filled_range // 4
-    data = list()
+    row_number: int = filled_range // 4
+    data = deque()
 
     for i in range(2, row_number + 1):
         tmp: Tuple[tuple] = work_sh.Range(
