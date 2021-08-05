@@ -11,7 +11,8 @@
 (Установка [virtual environment](https://pypi.python.org/pypi/virtualenv) всегда приветствуется)
 
 ```bash
-pip3 install -r requirements.txt
+pip install -r requirements.txt
+pip install pywin32
 ```
 
 Разгадывание капчи производится средствами [tesseract-ocr](https://github.com/tesseract-ocr/tesseract), поэтому для
