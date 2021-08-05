@@ -10,7 +10,7 @@ from selenium.webdriver.common import keys
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 from captcha import get_text_from_captcha
-from excel_interaction import write_excel_file, InputArgs, read_excel_file
+from excel_interaction import write_excel_file, InputArgs, read_excel_file, FILES
 
 
 class SessionFssp:
@@ -27,6 +27,8 @@ class SessionFssp:
 
     def _restart_sesion(self):
         self.browser.get('https://fssp.gov.ru/')
+        tmp_btn = self.browser.find_element_by_css_selector('label.field__toggle-wrap')
+        tmp_btn.click()
 
     def get_debts(self, args: InputArgs, all_debts: list) -> bool:
         """
@@ -49,6 +51,7 @@ class SessionFssp:
 
         start_page: bool = True  # понадоится если мы захотим ,по каким-то причинам,
         # продолжить поиск со стартовой страницы
+
         try:
             # Кнопка расширенного поиска доступна только на стартовой странице
             big_search_btn = self.browser.find_element_by_css_selector('a.btn.btn-light')
@@ -152,7 +155,7 @@ class SessionFssp:
 
 
 if __name__ == '__main__':
-    potential_debtors: Deque = read_excel_file()
+    potential_debtors: Deque = read_excel_file(FILES[0])
     session = SessionFssp()
     debts = []
 
@@ -163,4 +166,4 @@ if __name__ == '__main__':
         if not debt_found:
             potential_debtors.append(el)
 
-    write_excel_file(debts)
+    write_excel_file(data=debts, file_desc=FILES[0])

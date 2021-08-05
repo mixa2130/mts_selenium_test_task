@@ -1,7 +1,8 @@
 /.env
+/.idea/
+/venv/
 /geckodriver.exe
 /geckodriver.log
-/input.xlsx
-/venv/
-/.idea/
 /results.xlsx
+/sudrf_input.xlsx
+/fssp_input.xlsx
