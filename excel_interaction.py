@@ -11,29 +11,48 @@ class InputArgs(NamedTuple):
     first_name: str  # Имя потенциального должника
     last_name: str  # Фамилия
     patronymic: str  # Отчество
-    date: str  # Дата рождения
+    date: str = ''  # Дата рождения
 
 
 excel = win32.gencache.EnsureDispatch('Excel.Application')
-fssp_column_names: tuple = (
-    "Должник (физ. лицо: ФИО, дата и место рождения; юр. лицо: наименование, юр. адрес, фактический адрес)",
-    "Исполнительное производство (номер, дата возбуждения)",
-    "Реквизиты исполнительного документа (вид, дата принятия органом, номер, наименование органа,"
-    " выдавшего исполнительный документ)",
-    "Дата, причина окончания или прекращения ИП (статья, часть, пункт основания)",
-    "Предмет исполнения, сумма непогашенной задолженности",
-    "Отдел судебных приставов (наименование, адрес)",
-    "Судебный пристав-исполнитель, телефон для получения информации"
-)
+
+# Возможно стоит вынести данную структуру в json, но так как это только тестовое задание,
+# которое в дальнейшем не будет иметь поддержки, я этого делать не стал с целью экономии времени
+FILES = [
+    {'filename': 'fssp_input.xlsx', 'columns_cnt': 4, 'headers': (
+        "Должник (физ. лицо: ФИО, дата и место рождения; юр. лицо: наименование, юр. адрес, фактический адрес)",
+        "Исполнительное производство (номер, дата возбуждения)",
+        "Реквизиты исполнительного документа (вид, дата принятия органом, номер, наименование органа,"
+        " выдавшего исполнительный документ)",
+        "Дата, причина окончания или прекращения ИП (статья, часть, пункт основания)",
+        "Предмет исполнения, сумма непогашенной задолженности",
+        "Отдел судебных приставов (наименование, адрес)",
+        "Судебный пристав-исполнитель, телефон для получения информации"
+    )},
+    {'filename': 'sudrf_input.xlsx', 'columns_cnt': 3, 'headers': (
+        "Суд",
+        "Номер дела",
+        "Дата поступления",
+        "Информация по делу",
+        "Судья",
+        "Дата решения",
+        "Решение",
+        "Дата вступления в законную силу",
+        "Судебные акты"
+    )}
+]
 
 
-def write_excel_file(data: List[tuple], filename='results.xlsx'):
+def write_excel_file(data: List[tuple], file_desc: dict, filename='results.xlsx'):
     """
     Writes data to excel file.
     Each function call creates a new one Sheet.
-    If file with such name doesn't exist - creates it.
+    If file with such filename doesn't exist - creates it.
+
+    Universal function, as for fssp, as for sudrf
 
     :param data: data to write
+    :param file_desc: file from FILES
     :param filename: Name of the excel file to write, lying in the project root
     """
     if filename in os.listdir():
@@ -47,51 +66,70 @@ def write_excel_file(data: List[tuple], filename='results.xlsx'):
     wb.Sheets.Add().Name = new_sheet_name
     work_sh = wb.ActiveSheet
 
+    columns_cnt: int = len(file_desc['headers'])
+
     # Header
-    work_sh.Range("A1:G1").Value = fssp_column_names
+    work_sh.Range(
+        work_sh.Cells(1, 1),
+        work_sh.Cells(1, columns_cnt)
+    ).Value = file_desc['headers']
 
     # Data
     for row, el in enumerate(data):
         if len(el) > 2:
-            work_sh.Range(f"A{row + 2}:G{row + 2}").Value = el
+            work_sh.Range(
+                work_sh.Cells(row + 2, 1),
+                work_sh.Cells(row + 2, columns_cnt)
+            ).Value = el
         else:
             # No debts
             work_sh.Cells(row + 2, 1).Value = el[0]  # name
-            work_sh.Range(f"B{row + 2}:G{row + 2}").Value = el[1]
+            work_sh.Range(
+                work_sh.Cells(row + 2, 2),
+                work_sh.Cells(row + 2, columns_cnt)
+            ).Value = el[1]
 
     wb.Save()
     wb.Close(True)
     excel.Application.Quit()
 
 
-def read_excel_file(filename='input.xlsx') -> Deque:
+def read_excel_file(file_desc: dict) -> Deque:
     """
     Reads data from excel file.
+    Universal function, as for fssp, as for sudrf
 
-    :param filename: Name of the excel file to read, lying in the project root
+    :param file_desc: Name of the excel file to read, lying in the project root
 
     :raise pywintypes.com_error: (-2147352567, ..): If there are no such file
     """
-    wb = excel.Workbooks.Open(os.path.join(os.getcwd(), filename))
+    wb = excel.Workbooks.Open(os.path.join(os.getcwd(), file_desc['filename']))
     work_sh = wb.ActiveSheet
 
     filled_range = len(work_sh.UsedRange)
-    row_number: int = filled_range // 4
+    columns_cnt: int = file_desc['columns_cnt']
+    row_number: int = filled_range // columns_cnt
     data = deque()
 
     for i in range(2, row_number + 1):
         tmp: Tuple[tuple] = work_sh.Range(
             work_sh.Cells(i, 1),
-            work_sh.Cells(i, 4)
+            work_sh.Cells(i, columns_cnt)
         ).Value[0]
 
-        raw_date = datetime.strptime(str(tmp[3]), "%Y-%m-%d 00:00:00+00:00")
-        birthday: str = raw_date.strftime("%d.%m.%Y")
+        if columns_cnt == 4:
+            # В выборке есть поле date
+            raw_date = datetime.strptime(str(tmp[3]), "%Y-%m-%d 00:00:00+00:00")
+            birthday: str = raw_date.strftime("%d.%m.%Y")
 
-        data.append(InputArgs(last_name=str(tmp[0]),
-                              first_name=str(tmp[1]),
-                              patronymic=str(tmp[2]),
-                              date=birthday))
+            data.append(InputArgs(last_name=str(tmp[0]),
+                                  first_name=str(tmp[1]),
+                                  patronymic=str(tmp[2]),
+                                  date=birthday))
+        else:
+            data.append(InputArgs(last_name=str(tmp[0]),
+                                  first_name=str(tmp[1]),
+                                  patronymic=str(tmp[2])))
 
     wb.Close(True)
     excel.Application.Quit()
