@@ -1,6 +1,7 @@
 """This module is responsible for interaction with Excel using pywin32"""
-import time
 import os
+import json
+import time
 from datetime import datetime
 from collections import deque
 from typing import List, NamedTuple, Tuple, Deque
@@ -8,39 +9,17 @@ import win32com.client as win32
 
 
 class InputArgs(NamedTuple):
-    first_name: str  # Имя потенциального должника
     last_name: str  # Фамилия
+    first_name: str  # Имя потенциального должника
     patronymic: str  # Отчество
     date: str = ''  # Дата рождения
 
 
 excel = win32.gencache.EnsureDispatch('Excel.Application')
 
-# Возможно стоит вынести данную структуру в json, но так как это только тестовое задание,
-# которое в дальнейшем не будет иметь поддержки, я этого делать не стал с целью экономии времени
-FILES = [
-    {'filename': 'fssp_input.xlsx', 'columns_cnt': 4, 'headers': (
-        "Должник (физ. лицо: ФИО, дата и место рождения; юр. лицо: наименование, юр. адрес, фактический адрес)",
-        "Исполнительное производство (номер, дата возбуждения)",
-        "Реквизиты исполнительного документа (вид, дата принятия органом, номер, наименование органа,"
-        " выдавшего исполнительный документ)",
-        "Дата, причина окончания или прекращения ИП (статья, часть, пункт основания)",
-        "Предмет исполнения, сумма непогашенной задолженности",
-        "Отдел судебных приставов (наименование, адрес)",
-        "Судебный пристав-исполнитель, телефон для получения информации"
-    )},
-    {'filename': 'sudrf_input.xlsx', 'columns_cnt': 3, 'headers': (
-        "Суд",
-        "Номер дела",
-        "Дата поступления",
-        "Информация по делу",
-        "Судья",
-        "Дата решения",
-        "Решение",
-        "Дата вступления в законную силу",
-        "Судебные акты"
-    )}
-]
+with open('files.json', 'r', encoding='utf-8') as json_file:
+    json_data: dict = json.load(json_file)
+    FILES: List[dict] = json_data['files']
 
 
 def write_excel_file(data: List[tuple], file_desc: dict, filename='results.xlsx'):
