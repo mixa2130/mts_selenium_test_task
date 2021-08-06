@@ -3,14 +3,12 @@
 import time
 from typing import Deque
 
-from selenium.common.exceptions import NoSuchElementException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 
 from excel_interaction import FILES, read_excel_file, InputArgs, write_excel_file
-
 
 default_court_value: str = "Второй кассационный суд общей юрисдикции"
 
@@ -39,8 +37,9 @@ class SessionSudrf:
 
         :return: 0 - Ok
         """
+
         def get_text(lawsuit):
-            return lawsuit.text
+            return lawsuit.text.strip()
 
         fio: str = ' '.join((args.last_name, args.first_name, args.patronymic))
 
@@ -60,20 +59,19 @@ class SessionSudrf:
         form_btn.click()
         time.sleep(5)
 
-        try:
-            result_table = self.browser.find_element_by_xpath(
-                '(//div[@id="resultTable"])').find_element_by_css_selector('tbody')
-        except NoSuchElementException:
+        result: list = self.browser.find_elements_by_xpath('(//td[@id="resulfs"])')
+        lawsuits_info = result[-1].find_elements_by_tag_name('td')
+
+        if len(lawsuits_info) == 0:
             lawsuits.append((fio, 'Нет дел'))
             return 0
 
-        lawsuits_info = result_table.find_elements_by_tag_name('td')
-        counter: int = 0
+        counter: int = 7
 
         while counter < len(lawsuits_info):
-            tmp_lst: list = lawsuits_info[counter:counter+9]
-            lawsuits.append(tuple(map(get_text, tmp_lst)))
-            counter += 9
+            tmp_lst: list = lawsuits_info[counter:counter + 7]
+            lawsuits.append((fio, *tuple(map(get_text, tmp_lst))))
+            counter += 7
 
         return 0
 
